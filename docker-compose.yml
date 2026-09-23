@@ -1,0 +1,71 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: rankr_postgres
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: rankr
+      POSTGRES_USER: rankr
+      POSTGRES_PASSWORD: rankr
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rankr -d rankr"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: rankr_redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: ./rankr-backend
+    container_name: rankr_api
+    ports:
+      - "8001:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg2://rankr:rankr@postgres:5432/rankr
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: super-secret-key-change-in-production-min-32-chars-long
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      REFRESH_TOKEN_EXPIRE_DAYS: 30
+      ENVIRONMENT: development
+      ALLOWED_ORIGINS: '["http://localhost:3000","http://127.0.0.1:3000","http://localhost:3001"]'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./top_of_everything_be:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build:
+      context: ./top_of_everything_fe
+      dockerfile: Dockerfile
+    container_name: rankr_frontend
+    ports:
+      - "3001:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8001
+      WATCHPACK_POLLING: "true"
+      HOSTNAME: "0.0.0.0"
+    depends_on:
+      - api
+    volumes:
+      - ./top_of_everything_fe:/app
+      - /app/node_modules
+    command: npm run dev
+
+volumes:
+  postgres_data:
