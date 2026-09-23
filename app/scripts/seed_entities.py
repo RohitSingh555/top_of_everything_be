@@ -4,6 +4,9 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 from app.database import SessionLocal, engine, Base
+import app.users.models
+import app.entities.models
+import app.rankings.models
 from app.entities.models import Entity
 
 STARTER_ENTITIES = [

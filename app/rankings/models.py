@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Integer, Text, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, String, Integer, Text, DateTime, ForeignKey, UniqueConstraint, Index, func
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -28,6 +28,10 @@ class Ranking(Base):
     user = relationship("User", backref="rankings")
     items = relationship("RankingItem", back_populates="ranking", order_by="RankingItem.position", cascade="all, delete-orphan")
     versions = relationship("RankingVersion", back_populates="ranking", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index("uq_rankings_user_id_lower_title", "user_id", func.lower(func.trim(title)), unique=True),
+    )
 
 
 class RankingItem(Base):

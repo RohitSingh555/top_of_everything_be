@@ -8,12 +8,23 @@ from app.rankings.schemas import (
 )
 from app.rankings.service import (
     create_ranking, get_ranking_by_slug, update_ranking, delete_ranking,
-    toggle_like, add_comment, get_comments
+    toggle_like, add_comment, get_comments, get_rankings
 )
 from app.common.dependencies import get_current_user, get_optional_user
 from app.users.models import User
 
 router = APIRouter(prefix="/rankings", tags=["Rankings"])
+
+@router.get("", response_model=List[RankingPublic])
+def list_rankings(
+    category: Optional[str] = None,
+    q: Optional[str] = None,
+    username: Optional[str] = None,
+    limit: int = 20,
+    offset: int = 0,
+    db: Session = Depends(get_db)
+):
+    return get_rankings(db, category=category, q=q, username=username, limit=limit, offset=offset)
 
 @router.post("", response_model=RankingPublic, status_code=status.HTTP_201_CREATED)
 def create(data: RankingCreateRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):

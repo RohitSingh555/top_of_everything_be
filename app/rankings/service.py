@@ -3,7 +3,7 @@ import re
 import secrets
 from datetime import datetime
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from fastapi import HTTPException, status
 from typing import Optional, List
 from app.rankings.models import Ranking, RankingItem, RankingVersion, Like, Comment
@@ -26,11 +26,29 @@ def generate_unique_slug(db: Session, title: str) -> str:
     return f"{base}-{uuid.uuid4().hex[:8]}"
 
 def create_ranking(db: Session, user: User, data: RankingCreateRequest) -> Ranking:
-    slug = generate_unique_slug(db, data.title)
+    cleaned_title = data.title.strip() if data.title else ""
+    if not cleaned_title:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Ranking title cannot be empty."
+        )
+
+    # Ensure this user doesn't already have a ranking with the same name
+    existing = db.query(Ranking).filter(
+        Ranking.user_id == user.id,
+        func.lower(func.trim(Ranking.title)) == func.lower(cleaned_title)
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"You already have a ranking titled '{existing.title}'. Please choose a unique name."
+        )
+
+    slug = generate_unique_slug(db, cleaned_title)
     ranking = Ranking(
         slug=slug,
         user_id=user.id,
-        title=data.title,
+        title=cleaned_title,
         description=data.description,
         category=data.category,
         size=data.size,
@@ -100,7 +118,23 @@ def update_ranking(db: Session, slug: str, user: User, data: RankingUpdateReques
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to edit this ranking")
 
     if data.title is not None:
-        ranking.title = data.title
+        cleaned_title = data.title.strip()
+        if not cleaned_title:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Ranking title cannot be empty."
+            )
+        existing = db.query(Ranking).filter(
+            Ranking.user_id == user.id,
+            Ranking.id != ranking.id,
+            func.lower(func.trim(Ranking.title)) == func.lower(cleaned_title)
+        ).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"You already have a ranking titled '{existing.title}'. Please choose a unique name."
+            )
+        ranking.title = cleaned_title
     if data.description is not None:
         ranking.description = data.description
     if data.category is not None:
@@ -170,3 +204,38 @@ def get_comments(db: Session, slug: str) -> List[Comment]:
     if not ranking:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ranking not found")
     return db.query(Comment).filter(Comment.ranking_id == ranking.id).order_by(Comment.created_at.asc()).all()
+
+def get_rankings(
+    db: Session,
+    category: Optional[str] = None,
+    q: Optional[str] = None,
+    username: Optional[str] = None,
+    limit: int = 20,
+    offset: int = 0
+) -> List[Ranking]:
+    query = db.query(Ranking).filter(
+        Ranking.visibility == "public",
+        Ranking.status == "published"
+    )
+
+    if category and category.lower() != "all":
+        query = query.filter(Ranking.category.ilike(category))
+
+    if q and q.strip():
+        search_term = f"%{q.strip()}%"
+        query = query.filter(
+            or_(
+                Ranking.title.ilike(search_term),
+                Ranking.description.ilike(search_term)
+            )
+        )
+
+    if username and username.strip():
+        user = db.query(User).filter(User.username == username.strip()).first()
+        if user:
+            query = query.filter(Ranking.user_id == user.id)
+        else:
+            return []
+
+    return query.order_by(Ranking.created_at.desc()).offset(offset).limit(limit).all()
+
