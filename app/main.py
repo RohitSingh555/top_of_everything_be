@@ -9,6 +9,7 @@ from app.users.router import router as users_router
 from app.entities.router import router as entities_router
 from app.rankings.router import router as rankings_router
 from app.battles.router import router as battles_router
+from app.feed.router import router as feed_router
 
 from app.database import engine, Base, get_db
 import app.users.models
@@ -37,6 +38,7 @@ app.include_router(users_router)
 app.include_router(entities_router)
 app.include_router(rankings_router)
 app.include_router(battles_router)
+app.include_router(feed_router)
 
 
 @app.get("/health")

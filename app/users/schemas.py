@@ -12,6 +12,8 @@ class UserPublicProfile(BaseModel):
     follower_count: int = 0
     following_count: int = 0
     ranking_count: int = 0
+    is_following: bool = False
+    is_self: bool = False
     created_at: datetime
 
     class Config:

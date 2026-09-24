@@ -125,23 +125,48 @@ Block: blocker_id, blocked_id, created_at
 
 ---
 
-# Phase 4 — Social Layer
-**Goal:** Follow, like, comment, challenge, feed.
+# [DONE] Phase 4 — UI Polish & Blind Rank
+**Goal:** Explore page, Blind Rank mode, profile pages, duplicate title prevention, Spotify Wrapped style aesthetics.
 
 ---
 
-# Phase 5 — Game Modes
-**Goal:** Blind ranking and ranking battles.
+# [DONE] Phase 5 — Battle & Social Layer
+**Goal:** Solo Arena, Challenge-Response system, pending challenge inbox, shareable voting links, reveal-time countdown, guest voting.
 
 ---
 
-# Phase 6 — Discovery & Community
-**Goal:** Trending, topic pages, community rankings, compare.
+# [DONE] Phase 6 — Website Polish & Discoverability
+**Goal:** SEO, Open Graph preview cards, Notification Bell, Trending & Leaderboard on Explore, Dark Footer redesign, sitemap.xml.
 
 ---
 
-# Phase 7 — Polish & Launch
-**Goal:** SEO, notifications, moderation, analytics, performance.
+# Phase 7 — Final Social Polish & Launch
+**Goal:** Follow/Feed, commenting, moderation, analytics, performance tuning.
+
+> **Status update (aligned with codebase reality):**
+> - Already built in earlier phases (do NOT rebuild): `Follow` model + `POST/DELETE /users/{username}/follow` with counter maintenance (Phase 1), `Comment` model linked to `Ranking` + `POST/GET /rankings/{slug}/comments` (Phase 2), `Like` toggle (Phase 2), SEO/sitemap/robots + Notification Bell (Phase 6).
+> - Never built from Phase 4's prompt 4.1: the following-feed endpoint — now delivered as **`GET /feed`** (auth, paginated, category/q filters) in Phase 7 Step 1 instead of `/feed/home`.
+> - DB uses `Base.metadata.create_all()` on startup (no Alembic) — new tables (e.g., `reports`) are created automatically.
+
+### Step 1 — Follow & Feed System ✅ (pending user verification)
+- [x] Backend: `GET /feed` (`app/feed/router.py`, `app/feed/service.py`) — published rankings from followed users, `category`/`q`/`limit`/`offset` params, registered in `main.py`
+- [x] Backend: `GET /users/{username}` now returns `is_following` + `is_self` (optional auth via `get_optional_user`)
+- [x] Frontend: new `app/feed/page.tsx` (explore-style, renders `SpotifyRankingCard`, auth/loading/empty states)
+- [x] Frontend: `app/[username]/page.tsx` Follow button wired to API with optimistic follower-count updates, spinner, login redirect, hidden on own profile
+- [x] Frontend: Navbar nav gains "Feed" link
+- [x] Frontend: `/profile` ghost-route fix — new `app/profile/page.tsx` redirects to the signed-in user's real `/{username}` (was rendering a fake "@profile" page with always-0 stats)
+- [x] Frontend: Profile page gains "Profile Not Found" state on 404 (no more fallback name/stats for nonexistent handles)
+- [x] Frontend: Edit Profile modal on own profile (display name, bio, avatar URL, website) → existing `PATCH /users/me`, with live preview, char counter, save flash
+- [x] Frontend: Footer stats confirmed live via `GET /stats` (skeleton while loading, "—" only on API failure)
+
+### Step 2 — Commenting System ✅
+- [x] Backend: `Comment` model + `POST/GET /rankings/{slug}/comments` — already exist (Phase 2), verify only (tests: 401 unauth, 422 over-limit, user info attached, asc order, live `comment_count`)
+- [x] Frontend: dark-themed comment section at bottom of `app/[username]/[slug]/page.tsx` (note: there is no `app/ranking/[slug]` page — ranking view lives at `app/[username]/[slug]`), submit without reload — composer with ⌘/Ctrl+Enter, spinner, 1000-char counter, error states; sign-in prompt for signed-out viewers; loading skeletons + empty state; comment rows link to curator profiles with relative timestamps
+- [x] Frontend: action bar gains MessageCircle button with live comment count (scrolls to discussion)
+
+### Step 3 — Basic Moderation (Reporting) (next)
+- [ ] Backend: `Report` model (reporter_id, target_type, target_id, reason, status) + `POST /report`
+- [ ] Frontend: Flag/Report (lucide-react) button on `SpotifyRankingCard` bottoms + comments, with reason modal
 
 ---
 

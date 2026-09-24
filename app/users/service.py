@@ -1,9 +1,10 @@
 from sqlalchemy.orm import Session
+from typing import Optional
 from fastapi import HTTPException, status
 from app.users.models import User, Profile, Follow
 from app.users.schemas import ProfileUpdateRequest
 
-def get_user_profile(db: Session, username: str) -> dict:
+def get_user_profile(db: Session, username: str, viewer: Optional[User] = None) -> dict:
     user = db.query(User).filter(User.username == username).first()
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -14,6 +15,15 @@ def get_user_profile(db: Session, username: str) -> dict:
         db.add(profile)
         db.commit()
 
+    # Relationship of the viewing user to this profile (if authenticated)
+    is_self = bool(viewer and viewer.id == user.id)
+    is_following = False
+    if viewer and not is_self:
+        is_following = db.query(Follow).filter(
+            Follow.follower_id == viewer.id,
+            Follow.following_id == user.id
+        ).first() is not None
+
     return {
         "username": user.username,
         "display_name": profile.display_name or user.username,
@@ -23,6 +33,8 @@ def get_user_profile(db: Session, username: str) -> dict:
         "follower_count": profile.follower_count,
         "following_count": profile.following_count,
         "ranking_count": profile.ranking_count,
+        "is_following": is_following,
+        "is_self": is_self,
         "created_at": user.created_at
     }
 
@@ -42,7 +54,7 @@ def update_user_profile(db: Session, user: User, data: ProfileUpdateRequest) -> 
         profile.avatar_url = data.avatar_url
 
     db.commit()
-    return get_user_profile(db, user.username)
+    return get_user_profile(db, user.username, viewer=user)
 
 def follow_user(db: Session, current_user: User, target_username: str):
     target = db.query(User).filter(User.username == target_username).first()

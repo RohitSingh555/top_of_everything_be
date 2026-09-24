@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.users.schemas import UserPublicProfile, ProfileUpdateRequest
 from app.users.service import get_user_profile, update_user_profile, follow_user, unfollow_user
-from app.common.dependencies import get_current_user
+from app.common.dependencies import get_current_user, get_optional_user
 from app.users.models import User
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -17,8 +17,8 @@ def update_my_profile(data: ProfileUpdateRequest, current_user: User = Depends(g
     return update_user_profile(db, current_user, data)
 
 @router.get("/{username}", response_model=UserPublicProfile)
-def get_profile(username: str, db: Session = Depends(get_db)):
-    return get_user_profile(db, username)
+def get_profile(username: str, viewer: User | None = Depends(get_optional_user), db: Session = Depends(get_db)):
+    return get_user_profile(db, username, viewer=viewer)
 
 @router.post("/{username}/follow", status_code=status.HTTP_200_OK)
 def follow(username: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
